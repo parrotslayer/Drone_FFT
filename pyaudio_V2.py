@@ -7,7 +7,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 2
+RECORD_SECONDS = 0.2
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 # initialize portaudio
@@ -37,12 +37,12 @@ left = numpydata[0::2]
 right = numpydata[1::2]
 
 # Output as wav file
-wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
-wf.setnchannels(CHANNELS)
-wf.setsampwidth(p.get_sample_size(FORMAT))
-wf.setframerate(RATE)
-wf.writeframes(b''.join(frames_str))
-wf.close()
+#wf = wave.open(WAVE_OUTPUT_FILENAME, 'wb')
+#wf.setnchannels(CHANNELS)
+#wf.setsampwidth(p.get_sample_size(FORMAT))
+#wf.setframerate(RATE)
+#wf.writeframes(b''.join(frames_str))
+#wf.close()
 
 # FFT
 import scipy.signal
@@ -64,7 +64,7 @@ plt.show(block = False)
 from detect_peaks import detect_peaks
 
 # set minimum peak height = 0 and minimum peak distance = 20
-ind = detect_peaks(psd, mph=1e5, mpd=20, show=True)
+ind = detect_peaks(psd, mph=5e6, mpd=5, show=True)
 print(ind)
 print(psd[ind])
 
