@@ -7,7 +7,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 0.2
+RECORD_SECONDS = 0.1
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 # initialize portaudio
@@ -61,9 +61,6 @@ freqs = xf[1:]  # dont plot first element to remove DC component
 psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
 psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
 
-#plt.plot(freqs, psd)
-#plt.show(block = False)
-
 # Peak Detection
 from detect_peaks import detect_peaks
 
@@ -71,21 +68,41 @@ from detect_peaks import detect_peaks
 ind_L = detect_peaks(psd_L, mph=5e6, mpd=3, show=True)
 ind_R = detect_peaks(psd_R, mph=5e6, mpd=3, show=True)
 
-
-print(freqs[ind_R])
-print(psd_R[ind_R])
-print(len(ind_L))
 # Peak Filtering
 minF = 950      #min freq Hz
 maxF = 1050     #max freq Hz
 
 #check if anything lies within the range
+peaks_L_freq = []
+peaks_L_amp = []
+peaks_R_freq = []
+peaks_R_amp = []
+
+k = 0
 for i in range(len(ind_L)):
     if freqs[ind_L[i]] > minF and freqs[ind_L[i]] < maxF:
-        print(freqs[ind_L])
-        print(psd_L[ind_L])
+        peaks_L_freq.append(freqs[ind_L[i]])
+        peaks_L_amp.append(psd_L[ind_L[i]])
+
+for i in range(len(ind_R)):        
     if freqs[ind_R[i]] > minF and freqs[ind_R[i]] < maxF:
-        print(freqs[ind_R])
-        print(psd_R[ind_R])    
+        peaks_R_freq.append(freqs[ind_R[i]])
+        peaks_R_amp.append(psd_R[ind_R[i]])
+                
+print(peaks_L_amp)
+print(peaks_R_amp)
+
+peak_diff = peaks_L_amp[0] - peaks_R_amp[0]
+print(peak_diff)
+
+if peak_diff > 0:
+    #rotate left, CCW
+    azi = azi - inc
+else:
+    #rotate right, CW
+    azi = azi + inc
+    
         
     
+
+
