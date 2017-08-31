@@ -12,6 +12,14 @@ RATE = 48000
 RECORD_SECONDS = 0.1
 WAVE_OUTPUT_FILENAME = "test.wav"
 
+#Move the servo to starting location
+azi = 6000
+elev = 5000
+servo = maestro.Controller()
+servo.setTarget(0,azi)  #set servo to move to center position
+servo.setTarget(1,elev)     #elevation
+servo.close
+
 i = 0
 #infinite loop
 while(1):
@@ -48,27 +56,61 @@ while(1):
     T = 1.0/Fs
     N = CHUNKSIZE
 
-    yf = scipy.fftpack.fft(right)
+    yf_L = scipy.fftpack.fft(left)
+    yf_R = scipy.fftpack.fft(right)
     xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
     freqs = xf[1:]  # dont plot first element to remove DC component
-    psd = 2.0/N * np.abs(yf[0:N/2])[1:]
-
+    # Create power spectral density 
+    psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
+    psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
 
     # Peak Detection
     from detect_peaks import detect_peaks
 
-    # set minimum peak height = 0 and minimum peak distance = 20
-    ind = detect_peaks(psd, mph=3e5, mpd=8, show=False)
-    #print(ind)
-    #print(psd[ind])
-    i = i+1
-    print(i)
+    # detect peaks and show the m on a plot
+    ind_L = detect_peaks(psd_L, mph=5e6, mpd=3, show=False)
+    ind_R = detect_peaks(psd_R, mph=5e6, mpd=3, show=False)
 
-    #begin moving
-    azi = 5000 + 100*i
-    elev = 5000 + 100*i
-    servo = maestro.Controller()
-    servo.setTarget(0,azi)  #set servo to move to center position
-    servo.setTarget(1,elev)     #elevation
-    servo.close
+    # Peak Filtering
+    minF = 950      #min freq Hz
+    maxF = 1050     #max freq Hz
+
+    #check if anything lies within the range
+    peaks_L_freq = []
+    peaks_L_amp = []
+    peaks_R_freq = []
+    peaks_R_amp = []
+
+    for i in range(len(ind_L)):
+        if freqs[ind_L[i]] > minF and freqs[ind_L[i]] < maxF:
+            peaks_L_freq.append(freqs[ind_L[i]])
+            peaks_L_amp.append(psd_L[ind_L[i]])
+
+    for i in range(len(ind_R)):        
+        if freqs[ind_R[i]] > minF and freqs[ind_R[i]] < maxF:
+            peaks_R_freq.append(freqs[ind_R[i]])
+            peaks_R_amp.append(psd_R[ind_R[i]])
+                    
+    print(peaks_L_amp)
+    print(peaks_R_amp)
+    
+    # only move if detection has occured
+    if len(peaks_L_amp) > 0 and len(peaks_L_amp) > 0:
+        inc = 100
+        # find difference in peaks
+        peak_diff = peaks_L_amp[0] - peaks_R_amp[0]
+        print(peak_diff)
+        #rotate the PTU
+        if peak_diff > 0:
+            #rotate left, CCW
+            azi = azi - inc
+        else:
+            #rotate right, CW
+            azi = azi + inc
+
+        #Move the servo
+        servo = maestro.Controller()
+        servo.setTarget(0,azi)  #set servo to move to center position
+        servo.setTarget(1,elev)     #elevation
+        servo.close
