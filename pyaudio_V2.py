@@ -31,6 +31,7 @@ for _ in range(0, int(RATE / CHUNKSIZE * RECORD_SECONDS)):
 stream.stop_stream()
 stream.close()
 p.terminate()
+print('Done Recording')
 
 #extract channels
 left = numpydata[0::2]
@@ -51,20 +52,40 @@ Fs = RATE
 T = 1.0/Fs
 N = CHUNKSIZE
 
-yf = scipy.fftpack.fft(right)
+yf_L = scipy.fftpack.fft(left)
+yf_R = scipy.fftpack.fft(right)
 xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
 freqs = xf[1:]  # dont plot first element to remove DC component
-psd = 2.0/N * np.abs(yf[0:N/2])[1:]
+# Create power spectral density 
+psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
+psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
 
-plt.plot(freqs, psd)
-plt.show(block = False)
+#plt.plot(freqs, psd)
+#plt.show(block = False)
 
 # Peak Detection
 from detect_peaks import detect_peaks
 
-# set minimum peak height = 0 and minimum peak distance = 20
-ind = detect_peaks(psd, mph=5e6, mpd=5, show=True)
-print(ind)
-print(psd[ind])
+# detect peaks and show the m on a plot
+ind_L = detect_peaks(psd_L, mph=5e6, mpd=3, show=True)
+ind_R = detect_peaks(psd_R, mph=5e6, mpd=3, show=True)
 
+
+print(freqs[ind_R])
+print(psd_R[ind_R])
+print(len(ind_L))
+# Peak Filtering
+minF = 950      #min freq Hz
+maxF = 1050     #max freq Hz
+
+#check if anything lies within the range
+for i in range(len(ind_L)):
+    if freqs[ind_L[i]] > minF and freqs[ind_L[i]] < maxF:
+        print(freqs[ind_L])
+        print(psd_L[ind_L])
+    if freqs[ind_R[i]] > minF and freqs[ind_R[i]] < maxF:
+        print(freqs[ind_R])
+        print(psd_R[ind_R])    
+        
+    
