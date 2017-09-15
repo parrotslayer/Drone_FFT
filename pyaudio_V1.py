@@ -2,13 +2,26 @@ import pyaudio
 import numpy as np
 from matplotlib import pyplot as plt
 import wave
+import maestro
+import time
 
 CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 2
+RECORD_SECONDS = 3
 WAVE_OUTPUT_FILENAME = "test.wav"
+
+#Move the servo to starting location
+elev = 7800
+azi_max = 6500
+azi_min = 6000
+azi = 6000
+inc = 10
+servo = maestro.Controller()
+servo.setTarget(0,azi)  #set servo to move to center position
+servo.setTarget(1,elev)     #elevation
+servo.close
 
 # initialize portaudio
 p = pyaudio.PyAudio()

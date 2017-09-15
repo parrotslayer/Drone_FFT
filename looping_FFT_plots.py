@@ -10,7 +10,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 0.1
+RECORD_SECONDS = 0.5
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
@@ -27,9 +27,9 @@ servo.close
 #minimum height for peak detection
 peak_height = 1e6
 min_diff = 1e5      #minimum difference between peaks
-
+loop = 1
 #infinite loop
-while(1):
+while(loop < 5):
 # initialize portaudio
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT,
@@ -79,47 +79,16 @@ while(1):
     ind_L = detect_peaks(psd_L, mph=peak_height, mpd=3, show=False)
     ind_R = detect_peaks(psd_R, mph=peak_height, mpd=3, show=False)
 
-    # Peak Filtering
-    minF = 950      #min freq Hz
-    maxF = 1050     #max freq Hz
+    plt.figure()
+    plt.plot(xf[1:], 2.0/N * np.abs(psd_L))
+    plt.show(block = False)
 
-    #check if anything lies within the range
-    peaks_L_freq = []
-    peaks_L_amp = []
-    peaks_R_freq = []
-    peaks_R_amp = []
+    loop = loop + 1
 
-    for i in range(len(ind_L)):
-        if freqs[ind_L[i]] > minF and freqs[ind_L[i]] < maxF:
-            peaks_L_freq.append(freqs[ind_L[i]])
-            peaks_L_amp.append(psd_L[ind_L[i]])
+    # file-output.py
+    f = open('fft_parrot_15_09_2017.txt','w')
+    f.write(psd_L)
+    f.close()
 
-    for i in range(len(ind_R)):        
-        if freqs[ind_R[i]] > minF and freqs[ind_R[i]] < maxF:
-            peaks_R_freq.append(freqs[ind_R[i]])
-            peaks_R_amp.append(psd_R[ind_R[i]])
     
-    # only move if detection has occured
-    if len(peaks_L_amp) > 0 and len(peaks_R_amp) > 0:
-        # find difference in peaks
-        peak_diff = peaks_L_amp[0] - peaks_R_amp[0]
-        print(peak_diff)
-        #rotate the PTU
-        if abs(peak_diff) > min_diff:
-            if peak_diff > 0:
-                #rotate left, CCW
-                azi = azi - inc
-                if azi < azi_min:
-                    azi = azi_min
-            else:
-                #rotate right, CW
-                azi = azi + inc
-                if azi > azi_max:
-                    azi = azi_max
-                
 
-        #Move the servo
-        servo = maestro.Controller()
-        servo.setTarget(0,azi)  #set servo to move to center position
-        servo.setTarget(1,elev)     #elevation
-        servo.close
