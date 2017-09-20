@@ -10,7 +10,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 0.5
+RECORD_SECONDS = 1
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
@@ -76,19 +76,23 @@ while(loop < 5):
     from detect_peaks import detect_peaks
 
     # detect peaks and show the m on a plot
-    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=3, show=False)
+    peak_height = (max(psd_L)+max(psd_R))/1.5/2   #Take max as a fraction of averaged peaks
+    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=3, show=True)
     ind_R = detect_peaks(psd_R, mph=peak_height, mpd=3, show=False)
 
-    plt.figure()
+    print('Frequency = {0} Amplitude = {1}'.format(xf[ind_L],psd_L[ind_L]))
+
+    testnum = 8
+    fig = plt.figure()
     plt.plot(xf[1:], 2.0/N * np.abs(psd_L))
     plt.show(block = False)
-
+    fig.suptitle('Test {0} Loop {1}'.format(testnum,loop))
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude')
+    plt.savefig('Test{0}_Loop{1}'.format(testnum,loop))
     loop = loop + 1
 
-    # file-output.py
-    f = open('fft_parrot_15_09_2017.txt','w')
-    f.write(psd_L)
-    f.close()
+
 
     
 
