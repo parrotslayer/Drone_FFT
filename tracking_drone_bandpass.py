@@ -10,7 +10,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 0.2
+RECORD_SECONDS = 0.1
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
@@ -25,11 +25,12 @@ servo.setTarget(1,elev)     #elevation
 servo.close
 
 #minimum height for peak detection
-peak_height = 1e6
 min_diff = 0      #minimum difference between peaks
 
+loop = 0
 #infinite loop
-while(1):
+while(loop < 5):
+    loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT,
@@ -67,22 +68,50 @@ while(1):
     yf_R = scipy.fftpack.fft(right)
     xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
-    freqs = xf[1:]  # dont plot first element to remove DC component
+    freqs = xf  # dont plot first element to remove DC component
     # Create power spectral density 
-    psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
-    psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
+    psd_L = 2.0/N * np.abs(yf_L[0:N/2])
+    psd_R = 2.0/N * np.abs(yf_R[0:N/2])
+
+    # Band Pass Filter. Filter out elements outside of this window
+    index2freq = 1.0/(2.0*T)/(N/2)
+    minF = 8000      #min freq Hz
+    maxF = 9000     #max freq Hz
+    index_min = round(minF/index2freq)
+    index_max = round(maxF/index2freq)
+    NF_L = np.average(psd_L[10:])    # Find the noise floor
+    NF_R = np.average(psd_R[10:])
+    SNR = 1.2     # gain, not in dB. Using a 3dB SNR
+    peak_height = (NF_L+NF_R)/2*SNR     #calc the min height for a signal
+
+    print(peak_height)
+    testnum = 2
+    plt.figure()
+    NF1, = plt.plot(xf[10:],psd_L[10:],label="Raw Data")
+    NF2, = plt.plot((0,Fs/2),(peak_height, peak_height),'r--',label = "Noise Floor")
+    NF3, = plt.plot((0,Fs/2),(peak_height*SNR, peak_height*SNR),'k-',label = "Minimum Signal")
+    NF4, = plt.plot( (minF,minF), (0,max(psd_L[10:])), label = "Min Frequency" )
+    NF5, = plt.plot( (maxF,maxF), (0,max(psd_L[10:])), label = "Max Frequency" )
+    plt.legend(handles = [NF1,NF2,NF3,NF4,NF5])
+    plt.show(block=False)
+    plt.suptitle('Noise Floor Test {0} Loop {1}'.format(testnum,loop))
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude')
+    plt.savefig('NF_Test{0}_Loop{1}'.format(testnum,loop))
+    
+    psd_L[0:index_min] = 0  #Apply band pass filter
+    psd_R[0:index_min] = 0
+    psd_L[index_max:] = 0
+    psd_R[index_max:] = 0
 
     # Peak Detection
     from detect_peaks import detect_peaks
 
     # detect peaks and show the m on a plot
-    peak_height = (max(psd_L)+max(psd_R))/2/2   #Take max as a fraction of averaged peaks
-    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=2, show=False)
-    ind_R = detect_peaks(psd_R, mph=peak_height, mpd=2, show=False)
+    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=1, show=False)
+    ind_R = detect_peaks(psd_R, mph=peak_height, mpd=1, show=False)
 
     # Peak Filtering
-    minF = 8000      #min freq Hz
-    maxF = 9000     #max freq Hz
 
     #check if anything lies within the range
     peaks_L_freq = []
@@ -91,12 +120,10 @@ while(1):
     peaks_R_amp = []
 
     for i in range(len(ind_L)):
-        if freqs[ind_L[i]] > minF and freqs[ind_L[i]] < maxF:
             peaks_L_freq.append(freqs[ind_L[i]])
             peaks_L_amp.append(psd_L[ind_L[i]])
 
     for i in range(len(ind_R)):        
-        if freqs[ind_R[i]] > minF and freqs[ind_R[i]] < maxF:
             peaks_R_freq.append(freqs[ind_R[i]])
             peaks_R_amp.append(psd_R[ind_R[i]])
     
@@ -107,13 +134,23 @@ while(1):
         print(peak_diff)
 
         # plot FFT of both chanels
+        ind_L = detect_peaks(psd_L, mph=peak_height, mpd=1, show=False)
+        ind_R = detect_peaks(psd_R, mph=peak_height, mpd=1, show=False)
+
+        print('Frequency = {0} \n Amplitude = {1}'.format(xf[ind_L],psd_L[ind_L]))
+
+        # Print Differentials
         plt.figure()
         left_plot, = plt.plot(freqs, psd_L, label="psd_L")
         plt.hold(True)
         right_plot, = plt.plot(freqs, psd_R, label="psd_R")
         plt.legend(handles = [left_plot, right_plot])
+        plt.suptitle('Left and Right Channels Test {0} Loop {1}'.format(testnum,loop))
+        plt.xlabel('Frequency (Hz)')
+        plt.ylabel('Amplitude')
+        plt.savefig('LR_Test{0}_Loop{1}'.format(testnum,loop))
         plt.show(block = False)
-        
+       
         #rotate the PTU
         if abs(peak_diff) > min_diff:
             if peak_diff > 0:

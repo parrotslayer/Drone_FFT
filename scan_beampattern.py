@@ -79,12 +79,12 @@ for azi in range (azi_min, azi_max, inc):
     psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
 
     # Find which index to use for desired frequency
-    #for i in range(0,len(freqs)):
-     #   print(i)
-      #  print(freqs[i])
+   # for i in range(0,len(freqs)):
+    #    print(i)
+     #   print(freqs[i])
     
     # Find PSD at frequency of interest
-    index = 255
+    index = 724
     peaks_L_amp.append(psd_L[index])
     peaks_R_amp.append(psd_R[index])
     
@@ -109,6 +109,6 @@ plt.plot((6000, 6000), (min(diff), max(diff)), 'k-')
 plt.show(block = False)
 
 # file-output.py
-f = open('fft_parrot_15_09_2017.txt','w')
-f.write('hello world')
-f.close()
+#f = open('fft_parrot_15_09_2017.txt','w')
+#f.write('hello world')
+#f.close()

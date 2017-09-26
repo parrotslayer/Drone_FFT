@@ -10,7 +10,7 @@ CHUNKSIZE = 4096
 FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
-RECORD_SECONDS = 0.2
+RECORD_SECONDS = 0.1
 WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
@@ -25,11 +25,12 @@ servo.setTarget(1,elev)     #elevation
 servo.close
 
 #minimum height for peak detection
-peak_height = 1e6
 min_diff = 0      #minimum difference between peaks
 
+i = 0
 #infinite loop
-while(1):
+while(i < 10):
+    i = i + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
     stream = p.open(format=FORMAT,
@@ -67,22 +68,31 @@ while(1):
     yf_R = scipy.fftpack.fft(right)
     xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
-    freqs = xf[1:]  # dont plot first element to remove DC component
+    freqs = xf  # dont plot first element to remove DC component
     # Create power spectral density 
-    psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
-    psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
+    psd_L = 2.0/N * np.abs(yf_L[0:N/2])
+    psd_R = 2.0/N * np.abs(yf_R[0:N/2])
 
+    # Band Pass Filter. Filter out elements outside of this window
+    index2freq = 1.0/(2.0*T)/(N/2)
+    minF = 8000      #min freq Hz
+    maxF = 9000     #max freq Hz
+    index_min = round(minF/index2freq)
+    index_max = round(maxF/index2freq)
+    psd_L[0:index_min] = 0
+    psd_R[0:index_min] = 0
+    psd_L[index_max:] = 0
+    psd_R[index_max:] = 0
+    
     # Peak Detection
     from detect_peaks import detect_peaks
 
     # detect peaks and show the m on a plot
-    peak_height = (max(psd_L)+max(psd_R))/2/2   #Take max as a fraction of averaged peaks
-    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=2, show=False)
-    ind_R = detect_peaks(psd_R, mph=peak_height, mpd=2, show=False)
+    peak_height = (max(psd_L)+max(psd_R))/10/2   #Take max as a fraction of averaged peaks
+    ind_L = detect_peaks(psd_L, mph=peak_height, mpd=1, show=True)
+    ind_R = detect_peaks(psd_R, mph=peak_height, mpd=1, show=False)
 
     # Peak Filtering
-    minF = 8000      #min freq Hz
-    maxF = 9000     #max freq Hz
 
     #check if anything lies within the range
     peaks_L_freq = []
@@ -107,6 +117,11 @@ while(1):
         print(peak_diff)
 
         # plot FFT of both chanels
+        ind_L = detect_peaks(psd_L, mph=peak_height, mpd=1, show=False)
+        ind_R = detect_peaks(psd_R, mph=peak_height, mpd=1, show=False)
+
+        print('Frequency = {0} Amplitude = {1}'.format(xf[ind_L],psd_L[ind_L]))
+        
         plt.figure()
         left_plot, = plt.plot(freqs, psd_L, label="psd_L")
         plt.hold(True)
