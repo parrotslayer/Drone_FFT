@@ -29,7 +29,7 @@ peak_height = 1e6
 min_diff = 1e5      #minimum difference between peaks
 loop = 0
 #infinite loop
-while(loop < 5):
+while(loop < 7):
     loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
@@ -76,7 +76,7 @@ while(loop < 5):
     # Band Pass Filter. Filter out elements outside of this window
     index2freq = 1.0/(2.0*T)/(N/2)
     minF = 8000      #min freq Hz
-    maxF = 9000     #max freq Hz
+    maxF = 10000     #max freq Hz
     HpassFreq = 100     #ignore values below this freq when calc noise floor
     Hpass = round(HpassFreq/index2freq)
     index_min = round(minF/index2freq)
@@ -88,7 +88,7 @@ while(loop < 5):
     peak_height_L = NF_L*SNR     #calc the min height for a signal
     peak_height_R = NF_R*SNR     #calc the min height for a signal
 
-    testnum = 5
+    testnum = 9
     plt.figure()
     NF1, = plt.plot(xf[Hpass:],psd_L[Hpass:],label="Raw Data Left")
     NF2, = plt.plot(xf[Hpass:],psd_L[Hpass:],label="Raw Data Right")
@@ -103,6 +103,12 @@ while(loop < 5):
     plt.ylabel('Amplitude')
     plt.savefig('NF_Test{0}_Loop{1}'.format(testnum,loop))
 
+    #Apply band pass filter
+    psd_L[0:index_min] = 0  
+    psd_R[0:index_min] = 0
+    psd_L[index_max:] = 0
+    psd_R[index_max:] = 0
+        
     # Peak Detection
     from detect_peaks import detect_peaks
 
@@ -112,14 +118,6 @@ while(loop < 5):
 
     print('Frequency = {0} Amplitude = {1}'.format(xf[ind_L],psd_L[ind_L]))
 
-    #testnum = 4
-    #fig = plt.figure()
-    #plt.plot(xf[1:], 2.0/N * np.abs(psd_L))
-    #plt.show(block = False)
-    #fig.suptitle('Test {0} Loop {1}'.format(testnum,loop))
-    #plt.xlabel('Frequency (Hz)')
-    #plt.ylabel('Amplitude')
-    #plt.savefig('Test{0}_Loop{1}'.format(testnum,loop))
 
 
 

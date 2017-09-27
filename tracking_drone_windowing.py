@@ -90,8 +90,8 @@ while(loop < 13):
 
         # Band Pass Filter. Filter out elements outside of this window
         index2freq = 1.0/(2.0*T)/(N/2)
-        minF = 8000      #min freq Hz
-        maxF = 9000     #max freq Hz
+        minF = 9000      #min freq Hz
+        maxF = 10000     #max freq Hz
         HpassFreq = 10     #ignore values below this freq when calc noise floor
         Hpass = round(HpassFreq/index2freq)
         index_min = round(minF/index2freq)
