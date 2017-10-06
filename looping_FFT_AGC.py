@@ -15,7 +15,7 @@ WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
 azi = 6000
-elev = 7000
+elev = 8000
 azi_max = 8000
 azi_min = 4000
 inc = 50
@@ -26,7 +26,7 @@ servo.close
 
 loop = 0
 #infinite loop
-while(loop < 5):
+while(loop < 3):
     loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
@@ -74,7 +74,7 @@ while(loop < 5):
     index2freq = 1.0/(2.0*T)/(N/2)
     minF = 8000      #min freq Hz
     maxF = 10000     #max freq Hz
-    HpassFreq = 100     #ignore values below this freq when calc noise floor
+    HpassFreq = 1000     #ignore values below this freq when calc noise floor
     Hpass = round(HpassFreq/index2freq)
     index_min = round(minF/index2freq)
     index_max = round(maxF/index2freq)
@@ -87,14 +87,14 @@ while(loop < 5):
     peak_height_L = NF_L*SNR     #calc the min height for a signal
     peak_height_R = NF_R*SNR     #calc the min height for a signal
 
-    testnum = 2
+    testnum = 14
     plt.figure()
     NF1, = plt.plot(xf[Hpass:],psd_L[Hpass:],label="Raw Data Left")
     NF2, = plt.plot(xf[Hpass:],psd_R[Hpass:],label="Raw Data Right")
     NF3, = plt.plot((0,Fs/2),(peak_height_L, peak_height_L),'r--',label = "Noise Floor")
     NF4, = plt.plot((0,Fs/2),(peak_height_L*SNR, peak_height_L*SNR),'k-',label = "Minimum Signal")
-    NF5, = plt.plot( (minF,minF), (0,max(psd_L[10:])), label = "Min Frequency" )
-    NF6, = plt.plot( (maxF,maxF), (0,max(psd_L[10:])), label = "Max Frequency" )
+    NF5, = plt.plot( (minF,minF), (0,max(psd_L[Hpass:])), label = "Min Frequency" )
+    NF6, = plt.plot( (maxF,maxF), (0,max(psd_L[Hpass:])), label = "Max Frequency" )
     plt.legend(handles = [NF1,NF2,NF3,NF4,NF5,NF6])
     plt.show(block=False)
     plt.suptitle('Noise Floor Test {0} Loop {1}'.format(testnum,loop))
@@ -104,9 +104,9 @@ while(loop < 5):
 
 
     # Determine Variance of Signal and Noise
-    # Freduencues where the signal starts and ends
-    sig_begin = 5000/index2freq
-    sig_end = 17000/index2freq
+    # Frequencues where the signal starts and ends
+    sig_begin = 8000/index2freq
+    sig_end = 10000/index2freq
     std_sig_L = np.std(psd_L[sig_begin:sig_end], dtype=np.float64)
     std_sig_R = np.std(psd_R[sig_begin:sig_end], dtype=np.float64)
     std_noise_L = np.std(psd_L[sig_end:], dtype=np.float64)
@@ -114,23 +114,32 @@ while(loop < 5):
 
     psd_norm_L = np.divide(psd_L, (std_sig_L + 2*std_noise_L) )
     psd_norm_R = np.divide(psd_R, (std_sig_R + 2*std_noise_L) )
+    error_norm = psd_norm_L - psd_norm_R
 
     fig = plt.figure()
     ax1 = fig.add_subplot(211)
     NF1, = ax1.plot(xf[Hpass:],psd_norm_L[Hpass:],label="Raw Data Left")
     NF2, = ax1.plot(xf[Hpass:],psd_norm_R[Hpass:],label="Raw Data Right")
-    plt.legend(handles = [NF1,NF2])
-    plt.show(block=False)
+    NF3, = ax1.plot( (minF,minF), (0,max(psd_norm_R[Hpass:])), label = "Min Frequency" )
+    NF4, = ax1.plot( (maxF,maxF), (0,max(psd_norm_R[Hpass:])), label = "Max Frequency" )
+    plt.legend(handles = [NF1,NF2,NF3,NF4])
     plt.suptitle('Normalised Output Test {0} Loop {1}'.format(testnum,loop))
     plt.xlabel('Frequency (Hz)')
     plt.ylabel('Amplitude')
 
-    ax2 = fig.subplot(212)
-    ax2.plot(xf, error)    
-    
+    ax2 = fig.add_subplot(212)
+    NF3, = ax2.plot(xf[Hpass:],error_norm[Hpass:],label = "Error Signal")
+    NF6, = ax2.plot( (0,Fs/2), (0,0),'k-',label = "Zero Axis" )
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Amplitude')
+    plt.legend(handles = [NF3])
+    plt.show(block=False)
     plt.savefig('Normalised_Test{0}_Loop{1}'.format(testnum,loop))    
     
-
+    #print out maximum values for plotting
+    print("Loop Number = {0}".format(loop))
+    print(max(psd_norm_L[sig_begin:sig_end]))
+    print(max(psd_norm_R[sig_begin:sig_end]))
 
 
 
