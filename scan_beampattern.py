@@ -4,6 +4,11 @@ from matplotlib import pyplot as plt
 import wave
 import maestro
 import time
+import scipy.signal
+from scipy.fftpack import fft
+from detect_peaks import detect_peaks
+from scipy.signal import butter, lfilter, freqz
+
 
 # Recording parameters
 CHUNKSIZE = 4096
@@ -11,28 +16,25 @@ FORMAT = pyaudio.paInt32
 CHANNELS = 2
 RATE = 48000 
 RECORD_SECONDS = 0.1
-WAVE_OUTPUT_FILENAME = "test.wav"
 
 #Move the servo to starting location
 elev = 7800
-azi_max = 6500
-azi_min = 5500
+azi_max = 7500
+azi_min = 4500
 azi = azi_min
-inc = 10
+inc = 20
 servo = maestro.Controller()
 servo.setTarget(0,azi)  #set servo to move to center position
 servo.setTarget(1,elev)     #elevation
 servo.close
-
-#minimum height for peak detection
-peak_height = 1e6
-min_diff = 1e5      #minimum difference between peaks
 
 #arrays for plotting
 peaks_L_freq = []
 peaks_L_amp = []
 peaks_R_freq = []
 peaks_R_amp = []
+peaks_L_avg = []
+peaks_R_avg = []
 
 #infinite loop
 for azi in range (azi_min, azi_max, inc):
@@ -73,20 +75,33 @@ for azi in range (azi_min, azi_max, inc):
     yf_R = scipy.fftpack.fft(right)
     xf = np.linspace(0.0, 1.0/(2.0*T), N/2)
 
-    freqs = xf[1:]  # dont plot first element to remove DC component
+    freqs = xf  # dont plot first element to remove DC component
     # Create power spectral density 
-    psd_L = 2.0/N * np.abs(yf_L[0:N/2])[1:]
-    psd_R = 2.0/N * np.abs(yf_R[0:N/2])[1:]
-
-    # Find which index to use for desired frequency
-   # for i in range(0,len(freqs)):
-    #    print(i)
-     #   print(freqs[i])
+    psd_L = 2.0/N * np.abs(yf_L[0:N/2])
+    psd_R = 2.0/N * np.abs(yf_R[0:N/2])
     
     # Find PSD at frequency of interest
-    index = 724
-    peaks_L_amp.append(psd_L[index])
-    peaks_R_amp.append(psd_R[index])
+    index2freq = 1.0/(2.0*T)/(N/2)
+    minF = 8000      #min freq Hz
+    maxF = 10000     #max freq Hz
+    HpassFreq = 100     #ignore values below this freq when calc noise floor
+    Hpass = round(HpassFreq/index2freq)
+    index_min = round(minF/index2freq)
+    index_max = round(maxF/index2freq)
+    NF_L = np.average(psd_L[Hpass:])    # Find the noise floor
+    NF_R = np.average(psd_R[Hpass:])
+
+    SNR = 1     # gain, not in dB. Using a 3dB SNR
+    peak_height = (NF_L+NF_R)/2*SNR     #calc the min height for a signal
+    
+    psd_L[0:index_min] = 0  #Apply band pass filter
+    psd_R[0:index_min] = 0
+    psd_L[index_max:] = 0
+    psd_R[index_max:] = 0
+
+    #Add the maximum peaks to the list
+    peaks_L_avg.append(max(psd_L))
+    peaks_R_avg.append(max(psd_R))
     
     #Move the servo
     servo = maestro.Controller()
@@ -94,21 +109,73 @@ for azi in range (azi_min, azi_max, inc):
     servo.setTarget(1,elev)     #elevation
     servo.close
 
-    print(azi)
-    
 angle = range(azi_min,azi_max,inc)
-plt.plot(angle, peaks_L_amp)
-plt.plot(angle, peaks_R_amp)
+angle[:] = [x - 6000 for x in angle]
+angle = [x*0.08 for x in angle]   #convert angle to degrees
+diff = [m - n for m,n in zip(peaks_L_avg,peaks_R_avg)]
+sum_sig = [m + n for m,n in zip(peaks_L_avg,peaks_R_avg)]
+
+# Filter requirements.
+order = 3
+fs = 30       # sample rate, Hz
+cutoff = 3.667  # desired cutoff frequency of the filter, Hz
+
+def butter_lowpass(cutoff, fs, order=5):
+    nyq = 0.5 * fs
+    normal_cutoff = cutoff / nyq
+    b, a = butter(order, normal_cutoff, btype='low', analog=False)
+    return b, a
+
+def butter_lowpass_filter(data, cutoff, fs, order=5):
+    b, a = butter_lowpass(cutoff, fs, order=order)
+    y = lfilter(b, a, data)
+    return y
+
+
+# Get the filter coefficients so we can check its frequency response.
+b, a = butter_lowpass(cutoff, fs, order)
+
+diff_filt = butter_lowpass_filter(diff, cutoff, fs, order)
+sum_filt = butter_lowpass_filter(sum_sig, cutoff, fs, order)
+
+testfreq = 9000
+testnum = 2
+
+NF1, = plt.plot(angle, peaks_L_avg, label = "Left Channel")
+NF2, = plt.plot(angle, peaks_R_avg, label = "Right Channel")
+plt.legend(handles = [NF1,NF2])
 plt.show(block = False)
+plt.suptitle('Left and Right Channels Tone Frequency = {1} Hz Test {0}'.format(testnum, testfreq))
+plt.xlabel('Angle (Degrees)')
+plt.ylabel('Amplitude')
+plt.savefig('LR_Channels_Test{0}'.format(testnum))
+
+fig = plt.figure()
+ax1 = fig.add_subplot(211)
+NF3, = ax1.plot(angle, diff, label = "Unfiltered")
+ax1.plot((-150, 150), (0, 0), 'k-')
+ax1.plot((0, 0), (min(diff), max(diff)), 'k-')
+plt.legend(handles = [NF3])
+plt.xlabel('Angle (Degrees)')
+plt.ylabel('Amplitude')
+
+ax2 = fig.add_subplot(212)
+NF4, = ax2.plot(angle, diff_filt, label = "Low Pass Filter Fc = {0}".format(cutoff))
+ax2.plot((-150, 150), (0, 0), 'k-')
+ax2.plot((0, 0), (min(diff), max(diff)), 'k-')
+plt.legend(handles = [NF4])
+plt.suptitle('Error Signal Tone Frequency = {1} Hz Test {0}'.format(testnum,testfreq,cutoff))
+plt.xlabel('Angle (Degrees)')
+plt.ylabel('Amplitude')
+plt.show(block = False)
+plt.savefig('Error_Signal_Test{0}'.format(testnum))
+
 
 plt.figure()
-diff = [m - n for m,n in zip(peaks_L_amp,peaks_R_amp)]
-plt.plot(angle, diff)
-plt.plot((5400, 6600), (0, 0), 'r-')
-plt.plot((6000, 6000), (min(diff), max(diff)), 'k-')
+plt.plot(angle, sum_sig)
+plt.plot((0, 0), (min(sum_sig), max(sum_sig)), 'k-')
 plt.show(block = False)
-
-# file-output.py
-#f = open('fft_parrot_15_09_2017.txt','w')
-#f.write('hello world')
-#f.close()
+plt.suptitle('Sum Signal Tone Frequency = {1} Hz Test {0}'.format(testnum,testfreq))
+plt.xlabel('Angle (Degrees)')
+plt.ylabel('Amplitude')
+plt.savefig('Sum_Signal_Test{0}'.format(testnum))

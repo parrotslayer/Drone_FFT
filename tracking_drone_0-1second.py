@@ -127,7 +127,6 @@ while(1):
     # only move if detection has occured
     if len(peaks_L_amp) > 0 and len(peaks_R_amp) > 0:
         # find difference in peaks
-        peak_diff = peaks_L_amp[0] - peaks_R_amp[0]
         peak_diff = np.mean(peaks_L_amp) - np.mean(peaks_R_amp)
         # Print and plot Differentials
         #print('Loop {0}'.format(loop-10))
