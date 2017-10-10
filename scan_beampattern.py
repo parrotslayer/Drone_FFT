@@ -19,14 +19,16 @@ RECORD_SECONDS = 0.1
 
 #Move the servo to starting location
 elev = 7800
-azi_max = 7500
-azi_min = 4500
+azi_max = 6750 + 125
+azi_min = 5250
 azi = azi_min
-inc = 20
+inc = 5
 servo = maestro.Controller()
 servo.setTarget(0,azi)  #set servo to move to center position
 servo.setTarget(1,elev)     #elevation
 servo.close
+
+time.sleep(1)
 
 #arrays for plotting
 peaks_L_freq = []
@@ -109,9 +111,12 @@ for azi in range (azi_min, azi_max, inc):
     servo.setTarget(1,elev)     #elevation
     servo.close
 
+    print(azi)
+
 angle = range(azi_min,azi_max,inc)
 angle[:] = [x - 6000 for x in angle]
 angle = [x*0.08 for x in angle]   #convert angle to degrees
+angle[:] = [x - 10 for x in angle] #offset angle
 diff = [m - n for m,n in zip(peaks_L_avg,peaks_R_avg)]
 sum_sig = [m + n for m,n in zip(peaks_L_avg,peaks_R_avg)]
 
@@ -137,31 +142,45 @@ b, a = butter_lowpass(cutoff, fs, order)
 
 diff_filt = butter_lowpass_filter(diff, cutoff, fs, order)
 sum_filt = butter_lowpass_filter(sum_sig, cutoff, fs, order)
+peaks_L_filt = butter_lowpass_filter(peaks_L_avg, cutoff, fs, order)
+peaks_R_filt = butter_lowpass_filter(peaks_R_avg, cutoff, fs, order)
+diff_filt2 = [m - n for m,n in zip(peaks_L_filt,peaks_R_filt)]
 
 testfreq = 9000
-testnum = 2
+testnum = 14
+ff = 25    #ignore X first steps to shift graph
 
-NF1, = plt.plot(angle, peaks_L_avg, label = "Left Channel")
-NF2, = plt.plot(angle, peaks_R_avg, label = "Right Channel")
+fig = plt.figure()
+ax1 = fig.add_subplot(211) 
+NF1, = ax1.plot(angle[ff:], peaks_L_avg[ff:], label = "Left Channel")
+NF2, = ax1.plot(angle[ff:], peaks_R_avg[ff:], label = "Right Channel")
 plt.legend(handles = [NF1,NF2])
 plt.show(block = False)
 plt.suptitle('Left and Right Channels Tone Frequency = {1} Hz Test {0}'.format(testnum, testfreq))
+plt.xlabel('Angle (Degrees)')
+plt.ylabel('Amplitude')
+
+ax2 = fig.add_subplot(212) 
+NF11, = ax2.plot(angle[ff:], peaks_L_filt[ff:], label = "Left Filt".format(cutoff))
+NF21, = ax2.plot(angle[ff:], peaks_R_filt[ff:], label = "Right Filt".format(cutoff))
+plt.legend(handles = [NF11,NF21])
+plt.show(block = False)
 plt.xlabel('Angle (Degrees)')
 plt.ylabel('Amplitude')
 plt.savefig('LR_Channels_Test{0}'.format(testnum))
 
 fig = plt.figure()
 ax1 = fig.add_subplot(211)
-NF3, = ax1.plot(angle, diff, label = "Unfiltered")
-ax1.plot((-150, 150), (0, 0), 'k-')
+NF3, = ax1.plot(angle[ff:], diff[ff:], label = "Unfiltered")
+ax1.plot((-60, 60), (0, 0), 'k-')
 ax1.plot((0, 0), (min(diff), max(diff)), 'k-')
 plt.legend(handles = [NF3])
 plt.xlabel('Angle (Degrees)')
 plt.ylabel('Amplitude')
 
 ax2 = fig.add_subplot(212)
-NF4, = ax2.plot(angle, diff_filt, label = "Low Pass Filter Fc = {0}".format(cutoff))
-ax2.plot((-150, 150), (0, 0), 'k-')
+NF4, = ax2.plot(angle[ff:], diff_filt[ff:], label = "Fc = {0}".format(cutoff))
+ax2.plot((-60, 60), (0, 0), 'k-')
 ax2.plot((0, 0), (min(diff), max(diff)), 'k-')
 plt.legend(handles = [NF4])
 plt.suptitle('Error Signal Tone Frequency = {1} Hz Test {0}'.format(testnum,testfreq,cutoff))
@@ -170,10 +189,11 @@ plt.ylabel('Amplitude')
 plt.show(block = False)
 plt.savefig('Error_Signal_Test{0}'.format(testnum))
 
-
 plt.figure()
-plt.plot(angle, sum_sig)
+NF31, = plt.plot(angle[ff:], sum_sig[ff:], label = "Sum Unfiltered")
+NF32, = plt.plot(angle[ff:], sum_filt[ff:], label = "Sum Fc = {0}".format(cutoff))
 plt.plot((0, 0), (min(sum_sig), max(sum_sig)), 'k-')
+plt.legend(handles = [NF31, NF32])
 plt.show(block = False)
 plt.suptitle('Sum Signal Tone Frequency = {1} Hz Test {0}'.format(testnum,testfreq))
 plt.xlabel('Angle (Degrees)')
