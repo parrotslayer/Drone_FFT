@@ -16,10 +16,10 @@ RATE = 48000
 RECORD_SECONDS = 0.1
 
 #Move the servo to starting location
-azi = 6000  # Initial starting values
-elev = 7000
-azi_max = 8000
-azi_min = 4000
+azi = 5800  # Initial starting values
+elev = 8000
+azi_max = 6500
+azi_min = 5500
 servo = maestro.Controller()
 servo.setTarget(0,azi)  #set servo to move to center position
 servo.setTarget(1,elev)     #elevation
@@ -27,8 +27,11 @@ servo.close
 # Wait for servo to finish turning
 time.sleep(1)
 # Begin scanning in CW
-inc_scan = 100   # Increment for scanning
-scan_CW = 1
+inc_scan = 0   # Increment for scanning
+scan_CW = 0
+
+loop = 0
+error_buff = np.array([0, 0, 0, 0, 0])
 
 while(1):
     # Initialize portaudio
@@ -94,7 +97,7 @@ while(1):
     # Find the noise floor (Normalised)
     # Noise floor is average of L and R channels averaged 
     NF_LR = (np.average(psd_L[Hpass:]) + np.average(psd_R[Hpass:]))/2    
-    SNR = 2     # gain, not in dB. Using a +3dB SNR
+    SNR = 1.5     # gain, not in dB. Using a +3dB SNR
     peak_height_LR = NF_LR*SNR     #calc the min height for a signal
 
     # Apply band pass filter
@@ -109,36 +112,58 @@ while(1):
 
     # Peak Filtering, see if over N signals counted
     # Minimum number of peaks required for a drone to be confirmed
-    min_num_peaks = 3   
+    min_num_peaks = 1   
 
     # Move towards target if drone is detected
     # Need both L and R channels to see N peaks (Debatable?)
     if len(ind_L) >= min_num_peaks and len(ind_R) >= min_num_peaks:    
         # Difference between means of L and R channels in the band of interest
-        error_sig = np.mean(peaks_L[index_min:index:max]) - np.mean(peaks_R[index_min:index:max])
+        error_sig = np.mean(psd_L[index_min:index_max]) - np.mean(psd_R[index_min:index_max])
         # Sum of means of L and R channels in the band of interest
-        sum_sig = np.mean(peaks_L[index_min:index:max]) + np.mean(peaks_R[index_min:index:max])
+        sum_sig = np.mean(psd_L[index_min:index_max]) + np.mean(psd_R[index_min:index_max])
        
-        offset_diff = 0.1*NF_LR     #offset for min sum calc
         # Minimum sum value found as a function of the noise floor or HARD CODED
-        min_sum = 2*NF_LR + offset_diff
+        min_sum = NF_LR * 1
         
+        # ******************* DEBUGGING AND DIAGNOSTICS ***********************
+        testnum = 2
+        loop = loop + 1
+#        print("ERROR = {1},     SUM = {0},    MIN SUM = {2}".format(sum_sig,error_sig,min_sum))
+        #ind_L = detect_peaks(psd_L, mph=peak_height_LR, mpd=1, show=True)
+        #plt.plot((0,Fs/2),(peak_height_LR, peak_height_LR),'r--')
+        #plt.savefig('Peak Detection Test {0} Loop {1}'.format(testnum,loop))
+        
+        #ind_R = detect_peaks(psd_R, mph=peak_height_LR, mpd=1, show=True)
+        
+        # ******************** END ********************************************
+
         # Only move if sum above a certain value to prevent jittering on boresight                
         if abs(sum_sig) > min_sum:
 
             # Calculate amount to move by
-            inc = 50
+            inc = 20
+            alpha_error = 0.5
+            error2azi = 25
+
+            azi_error = np.mean(error_buff)*(1-alpha_error) + alpha_error*error_sig
+            azi_error = int(round(azi_error*error2azi))
+            print("ERROR = {0}, AZI_ERROR = {1}".format(error_sig,min_sum))
+
+            #print("Azimuth to move = {0}".format(azi_error))
+            # Move buffer along
+            error_buff[0:3] = error_buff[1:4]
+            error_buff[4] = error_sig
             
             # Rotate based on sign of error signal
-            if error_sig > 0:
+            if azi_error > 0:
                 #rotate CCW, towards Right
-                azi = azi - inc
+                azi = azi - abs(azi_error)
                 # Dont rotate past hard limit
                 if azi < azi_min:
                     azi = azi_min
             else:
                 #rotate CW, towards Left
-                azi = azi + inc
+                azi = azi + abs(azi_error)
                 # Dont rotate past hard limit
                 if azi > azi_max:
                     azi = azi_max

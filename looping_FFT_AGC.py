@@ -26,7 +26,7 @@ servo.close
 
 loop = 0
 #infinite loop
-while(loop < 2):
+while(loop < 5):
     loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
