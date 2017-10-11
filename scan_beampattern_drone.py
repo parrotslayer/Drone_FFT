@@ -22,7 +22,7 @@ elev = 7800
 azi_max = 6750 + 125
 azi_min = 5250
 azi = azi_min
-inc = 5
+inc = 10
 servo = maestro.Controller()
 servo.setTarget(0,azi)  #set servo to move to center position
 servo.setTarget(1,elev)     #elevation
@@ -90,37 +90,31 @@ for azi in range (azi_min, azi_max, inc):
     Hpass = round(HpassFreq/index2freq)
     index_min = round(minF/index2freq)
     index_max = round(maxF/index2freq)
-    NF_L = np.average(psd_L[Hpass:])    # Find the noise floor
-    NF_R = np.average(psd_R[Hpass:])
 
-    SNR = 1     # gain, not in dB. Using a 3dB SNR
-    peak_height = (NF_L+NF_R)/2*SNR     #calc the min height for a signal
-    
-    psd_L[0:index_min] = 0  #Apply band pass filter
-    psd_R[0:index_min] = 0
-    psd_L[index_max:] = 0
-    psd_R[index_max:] = 0
+    # Get the normalised signal from L and R
+    sig_end = round(20000/index2freq)
+    std_sig_L = np.std(psd_L[index_min:index_max], dtype=np.float64)
+    std_sig_R = np.std(psd_R[index_min:index_max], dtype=np.float64)
+    std_noise_L = np.std(psd_L[sig_end:], dtype=np.float64)
+    std_noise_R = np.std(psd_L[sig_end:], dtype=np.float64)
+    norm = std_sig_L + std_sig_R + (std_noise_L + std_noise_R)
+    psd_norm_L = psd_L/norm
+    psd_norm_R = np.divide(psd_R, norm)
 
-    #Add the maximum peaks to the list
-    peaks_L_avg.append(max(psd_L))
-    peaks_R_avg.append(max(psd_R))
-    
+    #Add the mean from each channel to the list
+    peaks_L_avg.append(np.mean(psd_norm_L))
+    peaks_R_avg.append(np.mean(psd_norm_R))
+
     #Move the servo
     servo = maestro.Controller()
     servo.setTarget(0,azi)  #set servo to move to center position
     servo.setTarget(1,elev)     #elevation
     servo.close
 
-    #print(azi)
-
-testfreq = 9000
-testnum = 15
-ff = 25    #ignore X first steps to shift graph
-
 angle = range(azi_min,azi_max,inc)
 angle[:] = [x - 6000 for x in angle]
-angle = [x*0.06 for x in angle]   #convert angle to degrees
-angle[:] = [x - 4 for x in angle] #offset angle
+angle = [x*0.08 for x in angle]   #convert angle to degrees
+angle[:] = [x - 10 for x in angle] #offset angle
 diff = [m - n for m,n in zip(peaks_L_avg,peaks_R_avg)]
 sum_sig = [m + n for m,n in zip(peaks_L_avg,peaks_R_avg)]
 
@@ -149,6 +143,10 @@ sum_filt = butter_lowpass_filter(sum_sig, cutoff, fs, order)
 peaks_L_filt = butter_lowpass_filter(peaks_L_avg, cutoff, fs, order)
 peaks_R_filt = butter_lowpass_filter(peaks_R_avg, cutoff, fs, order)
 diff_filt2 = [m - n for m,n in zip(peaks_L_filt,peaks_R_filt)]
+
+testfreq = 9000
+testnum = 14
+ff = 13    #ignore X first steps to shift graph
 
 fig = plt.figure()
 ax1 = fig.add_subplot(211) 

@@ -26,7 +26,7 @@ servo.close
 
 loop = 0
 #infinite loop
-while(loop < 5):
+while(loop < 2):
     loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
@@ -74,7 +74,7 @@ while(loop < 5):
     index2freq = 1.0/(2.0*T)/(N/2)
     minF = 8000      #min freq Hz
     maxF = 10000     #max freq Hz
-    HpassFreq = 100     #ignore values below this freq when calc noise floor
+    HpassFreq = 2000     #ignore values below this freq when calc noise floor
     Hpass = round(HpassFreq/index2freq)
     index_min = round(minF/index2freq)
     index_max = round(maxF/index2freq)

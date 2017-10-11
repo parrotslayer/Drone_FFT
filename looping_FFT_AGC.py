@@ -26,7 +26,7 @@ servo.close
 
 loop = 0
 #infinite loop
-while(loop < 3):
+while(loop < 2):
     loop = loop + 1
 # initialize portaudio
     p = pyaudio.PyAudio()
@@ -87,7 +87,7 @@ while(loop < 3):
     peak_height_L = NF_L*SNR     #calc the min height for a signal
     peak_height_R = NF_R*SNR     #calc the min height for a signal
 
-    testnum = 14
+    testnum = 9
     plt.figure()
     NF1, = plt.plot(xf[Hpass:],psd_L[Hpass:],label="Raw Data Left")
     NF2, = plt.plot(xf[Hpass:],psd_R[Hpass:],label="Raw Data Right")
